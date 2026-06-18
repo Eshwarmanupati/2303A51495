@@ -333,3 +333,134 @@ The original query works correctly but doesn't scale. A single composite index o
 
 *End of Stage 3*
 
+---
+
+# Stage 4: Performance Improvements
+
+## Problem
+
+Every time a student opens the notification page, the frontend calls `GET /notifications`, which hits the database. With 5000+ students loading notifications simultaneously, the database gets overwhelmed and response times increase.
+
+## Solution 1: Pagination
+
+Return 20 notifications per request using `LIMIT 20 OFFSET n` instead of returning everything. The frontend loads more when the student scrolls down.
+
+**How it helps:** Smaller queries, less data transferred, faster response.
+
+**Tradeoff:** `OFFSET` becomes slow on very deep pages (e.g., page 500), but students rarely scroll that far.
+
+## Solution 2: Redis Caching
+
+Cache a student's notifications in Redis with key `notifications:student:1042` and a TTL of 60 seconds. Serve from cache on repeated requests. Invalidate when a notification is created, read, or deleted.
+
+**How it helps:** Avoids hitting PostgreSQL for repeated requests within the TTL window.
+
+**Tradeoff:** Data can be stale for up to 60 seconds. Acceptable for notifications — a small delay won't hurt.
+
+## Solution 3: Real-Time Notifications (WebSockets)
+
+Keep a persistent WebSocket connection per logged-in student. When a notification is created, push it directly to the student's connection instead of waiting for the next API call.
+
+**How it helps:** No polling, no wasted requests, instant delivery.
+
+**Tradeoff:** Each connection uses server memory. Fine for 5000 students, but at 100K+ we'd need Redis Pub/Sub to coordinate across servers.
+
+## Solution 4: Read Replicas
+
+Direct all `GET` queries to a read-only replica of the database. Writes (POST, PATCH, DELETE) go to the primary.
+
+**How it helps:** Splits the load. Most traffic is reads, so the primary handles only writes.
+
+**Tradeoff:** Replication lag (usually milliseconds) — a just-created notification might not appear for a brief moment.
+
+## Recommended Approach
+
+Use **Pagination + Redis Caching + WebSockets** together. Pagination reduces query size. Redis caching handles repeated loads. WebSockets handle new notifications in real-time. Read replicas are worth adding only if the system scales beyond a single campus.
+
+---
+
+*End of Stage 4*
+
+---
+
+# Stage 5: Scalable Notification Delivery
+
+## Problems With Current Design
+
+- **Synchronous and slow:** The loop processes 50,000 students one by one. Email sending, DB save and push happen sequentially for each student. This could take hours.
+- **Single point of failure:** If the server crashes at student 25,000, the remaining 25,000 never get notified. There's no way to resume.
+- **No error handling:** If `send_email` fails for a student, the code doesn't retry or log the failure. It just moves on (or worse, crashes the entire loop).
+- **Blocking the server:** While this loop runs, the server is busy. HR's browser is likely stuck waiting, and other API requests are delayed.
+- **Tightly coupled:** Email sending, DB save and push notification are all mixed together. If the email service is down, even the DB save doesn't happen.
+
+## Failure Scenario
+
+If `send_email` fails for 200 students midway:
+- Those 200 students may not have their notification saved to DB either (since all three operations are in the same flow).
+- There's no record of which students failed, so retrying manually is impossible.
+- The remaining students after the failure point may or may not get processed, depending on whether the error crashes the loop.
+- HR has no visibility — they clicked "Notify All" and have no idea it partially failed.
+
+## Improved Design
+
+1. **Save notifications to DB first** for all 50,000 students in a batch insert. This is fast and reliable.
+2. **Push each notification to a message queue** (like RabbitMQ or Kafka) as a job: `{ studentId, notificationId, type: "email" }`.
+3. **Worker processes** pick jobs from the queue and send emails independently. Multiple workers can run in parallel.
+4. **If a job fails**, the queue automatically retries it (with exponential backoff). After 3 failures, move to a dead-letter queue for manual review.
+
+```
+HR clicks "Notify All"
+        ↓
+[API Server] → Batch INSERT into DB (fast)
+        ↓
+[API Server] → Push 50,000 jobs to Message Queue
+        ↓
+[Worker 1] [Worker 2] [Worker 3]  ← pick jobs in parallel
+        ↓
+    send_email() per student
+    (retry on failure)
+```
+
+## Should DB Save And Email Sending Be Together?
+
+**No.** They should be separated. Saving to DB is fast and under our control. Email sending depends on an external service that can be slow or fail. If we couple them, a slow email service blocks DB writes and vice versa. Save the notification first (so the student sees it in-app immediately), then send the email asynchronously through the queue.
+
+## Revised Pseudocode
+
+```
+function notify_all(student_ids, message):
+    // Step 1: Batch save to database
+    notifications = batch_insert_db(student_ids, message)
+
+    // Step 2: Push to message queue for async processing
+    for notification in notifications:
+        queue.push({
+            studentId: notification.student_id,
+            notificationId: notification.id,
+            type: "email"
+        })
+
+    return { status: "queued", count: len(student_ids) }
+
+// Separate worker process
+function email_worker():
+    while true:
+        job = queue.pop()
+        try:
+            send_email(job.studentId, job.notificationId)
+        catch error:
+            if job.retries < 3:
+                queue.push(job, delay: 2 ^ job.retries seconds)
+            else:
+                dead_letter_queue.push(job)
+```
+
+## Conclusion
+
+The key fix is to **separate the fast operation (DB save) from the slow operation (email)**. By using a message queue, we get parallel processing, automatic retries and fault tolerance. HR's request returns instantly with "queued", and the workers handle delivery in the background.
+
+---
+
+*End of Stage 5*
+
+
