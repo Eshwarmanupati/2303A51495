@@ -12,7 +12,7 @@ export const logger = {
   logApiStart: (url, params = {}) => {
     const timestamp = new Date().toISOString();
     console.log(
-      `%c[API START] %c${timestamp} %c| Fetching from: %c${url} %c| Params:`,
+      `%c[API REQUEST START] %c${timestamp} %c| Fetching from: %c${url} %c| Params:`,
       "color: #ff9800; font-weight: bold;",
       "color: #888;",
       "color: #ccc;",
@@ -30,7 +30,7 @@ export const logger = {
   logApiSuccess: (url, count) => {
     const timestamp = new Date().toISOString();
     console.log(
-      `%c[API SUCCESS] %c${timestamp} %c| URL: %c${url} %c| Fetched %c${count}%c records`,
+      `%c[API REQUEST SUCCESS] %c${timestamp} %c| URL: %c${url} %c| Fetched %c${count}%c records`,
       "color: #4caf50; font-weight: bold;",
       "color: #888;",
       "color: #ccc;",
@@ -49,7 +49,7 @@ export const logger = {
   logApiFailure: (url, error) => {
     const timestamp = new Date().toISOString();
     console.error(
-      `%c[API FAILURE] %c${timestamp} %c| URL: %c${url} %c| Error: %c${error}`,
+      `%c[API REQUEST FAILURE] %c${timestamp} %c| URL: %c${url} %c| Error: %c${error}`,
       "color: #f44336; font-weight: bold;",
       "color: #888;",
       "color: #ccc;",
@@ -68,7 +68,7 @@ export const logger = {
   logFilterChange: (filterType, fromValue, toValue) => {
     const timestamp = new Date().toISOString();
     console.log(
-      `%c[FILTER CHANGE] %c${timestamp} %c| Filter: %c${filterType} %c| %c${fromValue} %c→ %c${toValue}`,
+      `%c[FILTER CHANGES] %c${timestamp} %c| Filter: %c${filterType} %c| %c${fromValue} %c→ %c${toValue}`,
       "color: #9c27b0; font-weight: bold;",
       "color: #888;",
       "color: #ccc;",
@@ -88,7 +88,7 @@ export const logger = {
   logPaginationChange: (page, limit) => {
     const timestamp = new Date().toISOString();
     console.log(
-      `%c[PAGINATION CHANGE] %c${timestamp} %c| Page: %c${page} %c| Limit: %c${limit}`,
+      `%c[PAGE CHANGES] %c${timestamp} %c| Page: %c${page} %c| Limit: %c${limit}`,
       "color: #2196f3; font-weight: bold;",
       "color: #888;",
       "color: #ccc;",
@@ -105,7 +105,7 @@ export const logger = {
   logPriorityPageLoad: (topN) => {
     const timestamp = new Date().toISOString();
     console.log(
-      `%c[PRIORITY LOAD] %c${timestamp} %c| Priority Inbox Rendered | Limit: %cTop ${topN}`,
+      `%c[PRIORITY INBOX GENERATION] %c${timestamp} %c| Priority Inbox Rendered | Limit: %cTop ${topN}`,
       "color: #e91e63; font-weight: bold;",
       "color: #888;",
       "color: #ccc;",

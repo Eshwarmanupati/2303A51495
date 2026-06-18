@@ -46,6 +46,7 @@ const DEFAULT_CONFIG = {
  */
 export function NotificationCard({ notification }) {
   const { Type, Message, Timestamp, ID } = notification;
+  const isRead = !!(notification.IsRead || notification.isRead || notification.is_read || notification.Is_Read);
   const score = getPriorityScore(Type);
   const config = TYPE_CONFIG[Type] || DEFAULT_CONFIG;
 
@@ -74,13 +75,16 @@ export function NotificationCard({ notification }) {
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
         border: `1px solid ${config.border}`,
+        borderLeft: isRead ? `1px solid ${config.border}` : `5px solid ${config.color}`,
         borderRadius: "12px",
         boxShadow: "0 4px 30px rgba(0, 0, 0, 0.1)",
-        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+        opacity: isRead ? 0.75 : 1,
+        transition: "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, opacity 0.2s ease",
         "&:hover": {
           transform: "translateY(-3px)",
           boxShadow: `0 8px 30px ${config.border}`,
           borderColor: config.color,
+          opacity: 1,
         },
       }}
     >
@@ -97,9 +101,25 @@ export function NotificationCard({ notification }) {
               backgroundColor: config.bg,
               border: `1px solid ${config.border}`,
               flexShrink: 0,
+              position: "relative"
             }}
           >
             {config.icon}
+            {!isRead && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: -2,
+                  right: -2,
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  backgroundColor: "#ff4b4b",
+                  border: "2px solid #12131a",
+                  boxShadow: "0 0 8px #ff4b4b"
+                }}
+              />
+            )}
           </Box>
 
           <Box sx={{ flexGrow: 1, width: "100%" }}>
@@ -127,6 +147,18 @@ export function NotificationCard({ notification }) {
                     color: "rgba(255, 255, 255, 0.7)",
                     borderColor: "rgba(255, 255, 255, 0.2)",
                     borderRadius: "6px",
+                  }}
+                />
+                <Chip
+                  label={isRead ? "Read" : "Unread"}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: "0.7rem",
+                    backgroundColor: isRead ? "rgba(255, 255, 255, 0.05)" : "rgba(124, 77, 255, 0.15)",
+                    color: isRead ? "rgba(255, 255, 255, 0.4)" : "#b47cff",
+                    border: isRead ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(124, 77, 255, 0.4)",
+                    borderRadius: "4px",
                   }}
                 />
               </Stack>
