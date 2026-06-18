@@ -556,3 +556,62 @@ This heap-based solution ensures the client/server only performs bounded work pe
 ---
 
 *End of Stage 6*
+
+---
+
+# Stage 7: Frontend Integration, Logging Middleware & Multi-Page Views
+
+## Logging Integration Approach
+
+Logging throughout the application is managed via a dedicated **Logging Middleware Utility** (`logger`) matching the core design guidelines:
+- **API Start**: Triggered inside the `fetchNotifications` function just before `fetch()` is executed. It logs the target URL and the query parameters object.
+- **API Success**: Triggered inside `fetchNotifications` upon a successful HTTP response. It logs the URL and the count of items parsed.
+- **API Failure**: Caught inside `fetchNotifications`'s `try/catch` block. It logs the URL and the specific error message.
+- **Filter Changes**: Handled inside `NotificationsPage.jsx` when a user selects a new tab in the `NotificationFilter` component. It logs the change event `fromValue → toValue`.
+- **Pagination Changes**: Handled in `NotificationsPage.jsx` when either the page number or items per page limit changes, logging the new state parameters.
+- **Priority Inbox Page Load**: Logged inside `PriorityInboxPage.jsx` using a React `useEffect` hook that triggers on mounting or whenever the Top N limit changes.
+
+---
+
+## Pagination Strategy
+
+The pagination follows a client-server coordinated strategy:
+1. **Request parameters**: The client appends `limit` (page size) and `page` (1-indexed offset) as query parameters to the remote GET request:
+   `/notifications?limit=10&page=2`
+2. **State & URL Synchronization**: Local states (`page` and `limit`) are synchronized with the browser's URL search parameters. This ensures page refreshes retain the user's correct page offset and list size.
+3. **MUI Navigation Buttons**: Clean Back/Next navigation buttons are displayed, calculated based on the total count returned by the API.
+
+---
+
+## Filtering Strategy
+
+To prevent redundant renders:
+1. Filters are configured using the `NotificationFilter` component (Event, Result, Placement, or All).
+2. When the user updates the filter, it updates the query parameter `notification_type` in the URL:
+   `/notifications?notification_type=Placement`
+3. This triggers the custom `useNotifications` hook to fire a new API request filtering the data on the server side.
+
+---
+
+## Priority Inbox Implementation
+
+The Priority Inbox is hosted on a separate page view:
+1. **Data Ingestion**: It fetches a bulk set of notifications (`limit=100`) from the server to guarantee it has enough data to rank priorities.
+2. **Client-side Sorting**: The raw list is sorted using a multi-key comparator:
+   - **Primary Key**: Priority score (`Placement` = 3, `Result` = 2, `Event` = 1) in descending order.
+   - **Secondary Key**: Timestamp in descending order (newer notifications first).
+3. **Inbox Size Selector ($N$)**: The user can pick the Top N limit (Top 10 / 15 / 20) via a select dropdown, which filters the sorted list:
+   `sortedList.slice(0, N)`
+
+---
+
+## Error Handling
+
+Robust error boundaries are implemented throughout the application:
+1. **Network Failures**: Catch block parses HTTP error codes (e.g. 401/404/500) and displays them via user-friendly MUI Alerts.
+2. **Invalid Tokens**: Detects missing or invalid Bearer tokens and prompts the user with an authorization form.
+3. **Recovery controls**: "Retry" buttons allow the user to refresh the inbox directly from the UI without reloading the browser.
+
+---
+
+*End of Stage 7*
