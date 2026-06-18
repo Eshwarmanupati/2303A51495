@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchNotifications } from "../api/notifications";
 
 // Priority weights: Placement = 3, Result = 2, Event = 1
@@ -21,19 +21,33 @@ export function getPriorityScore(type) {
 
 /**
  * Custom React Hook to fetch and manage notifications.
- * Automatically handles sorting by priority score and timestamp.
+ * Supports query parameters for limit, page, and notification_type.
  * 
  * @param {string} authToken - The Bearer Authorization Token
+ * @param {Object} params - Query parameters for filtering and pagination
+ * @param {number} params.limit - Max items to retrieve per page
+ * @param {number} params.page - Current page number
+ * @param {string} params.notification_type - Notification Type filter (All | Event | Result | Placement)
  * @returns {Object} Fetch state and refetch callback
  */
-export function useNotifications(authToken) {
+export function useNotifications(authToken, params = {}) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Total notifications count (useful if server returns total count, otherwise length of dataset)
+  const [total, setTotal] = useState(0);
+
+  // Destructure params to track changes in useEffect
+  const { limit, page, notification_type } = params;
+
+  // Use a ref to track the previous values of parameters to avoid unnecessary double fetches
+  const prevParamsRef = useRef({ limit, page, notification_type, authToken });
 
   const loadNotifications = useCallback(async () => {
     if (!authToken) {
       setNotifications([]);
+      setTotal(0);
       setError(null);
       return;
     }
@@ -42,39 +56,49 @@ export function useNotifications(authToken) {
     setError(null);
 
     try {
-      const data = await fetchNotifications(authToken);
+      const fetchParams = {};
+      if (limit) fetchParams.limit = limit;
+      if (page) fetchParams.page = page;
+      if (notification_type) fetchParams.notification_type = notification_type;
+
+      const data = await fetchNotifications(authToken, fetchParams);
       const rawList = data.notifications ?? [];
-
-      // Sort notifications by Priority Weight (descending) and then Timestamp (descending)
-      const sortedList = [...rawList].sort((a, b) => {
-        const scoreA = getPriorityScore(a.Type);
-        const scoreB = getPriorityScore(b.Type);
-
-        if (scoreA !== scoreB) {
-          return scoreB - scoreA; // Descending order of priority
-        }
-
-        // Secondary sort: timestamp descending (newer notifications rank higher)
-        const timeA = new Date(a.Timestamp).getTime();
-        const timeB = new Date(b.Timestamp).getTime();
-        return timeB - timeA;
-      });
-
-      setNotifications(sortedList);
+      
+      setNotifications(rawList);
+      
+      // If the API returns a total count, use it. Otherwise, estimate or use array length.
+      setTotal(data.total ?? rawList.length);
     } catch (err) {
       setError(err.message || "Failed to load notifications.");
       setNotifications([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [authToken]);
+  }, [authToken, limit, page, notification_type]);
 
   useEffect(() => {
+    // Check if the actual dependencies changed to prevent redundant fetches
+    const prev = prevParamsRef.current;
+    if (
+      prev.limit !== limit ||
+      prev.page !== page ||
+      prev.notification_type !== notification_type ||
+      prev.authToken !== authToken
+    ) {
+      prevParamsRef.current = { limit, page, notification_type, authToken };
+      loadNotifications();
+    }
+  }, [authToken, limit, page, notification_type, loadNotifications]);
+
+  // Initial load
+  useEffect(() => {
     loadNotifications();
-  }, [loadNotifications]);
+  }, []);
 
   return {
     notifications,
+    total,
     loading,
     error,
     refetch: loadNotifications,
