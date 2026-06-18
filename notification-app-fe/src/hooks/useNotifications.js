@@ -34,14 +34,9 @@ export function useNotifications(authToken, params = {}) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Total notifications count (useful if server returns total count, otherwise length of dataset)
   const [total, setTotal] = useState(0);
 
-  // Destructure params to track changes in useEffect
   const { limit, page, notification_type } = params;
-
-  // Use a ref to track the previous values of parameters to avoid unnecessary double fetches
   const prevParamsRef = useRef({ limit, page, notification_type, authToken });
 
   const loadNotifications = useCallback(async () => {
@@ -65,8 +60,6 @@ export function useNotifications(authToken, params = {}) {
       const rawList = data.notifications ?? [];
       
       setNotifications(rawList);
-      
-      // If the API returns a total count, use it. Otherwise, estimate or use array length.
       setTotal(data.total ?? rawList.length);
     } catch (err) {
       setError(err.message || "Failed to load notifications.");
@@ -78,7 +71,6 @@ export function useNotifications(authToken, params = {}) {
   }, [authToken, limit, page, notification_type]);
 
   useEffect(() => {
-    // Check if the actual dependencies changed to prevent redundant fetches
     const prev = prevParamsRef.current;
     if (
       prev.limit !== limit ||
@@ -91,7 +83,6 @@ export function useNotifications(authToken, params = {}) {
     }
   }, [authToken, limit, page, notification_type, loadNotifications]);
 
-  // Initial load
   useEffect(() => {
     loadNotifications();
   }, []);

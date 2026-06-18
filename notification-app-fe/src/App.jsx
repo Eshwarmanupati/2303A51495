@@ -5,21 +5,20 @@ import StarIcon from "@mui/icons-material/Star";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { PriorityInboxPage } from "./pages/PriorityInboxPage";
 
-// Define a premium modern dark theme with harmonious HSL-tailored colors
 const darkTheme = createTheme({
   palette: {
     mode: "dark",
     primary: {
-      main: "#7c4dff", // Modern Indigo/Purple
+      main: "#7c4dff",
       light: "#b47cff",
       dark: "#3f1dcb",
     },
     secondary: {
-      main: "#00e5ff", // Bright Cyan/Teal accent
+      main: "#00e5ff",
     },
     background: {
-      default: "#0a0b10", // Rich space black/deep blue background
-      paper: "#12131a",   // Darker gray-blue paper
+      default: "#0a0b10",
+      paper: "#12131a",
     },
     text: {
       primary: "#ffffff",
@@ -76,7 +75,6 @@ export default function App() {
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <Container maxWidth="md" sx={{ py: 4 }}>
-        {/* Navigation Tabs Bar */}
         <Paper
           elevation={0}
           sx={{
@@ -126,7 +124,6 @@ export default function App() {
           </Tabs>
         </Paper>
 
-        {/* Render Active Page */}
         <Box sx={{ minHeight: "60vh" }}>
           {activeTab === 0 ? <NotificationsPage /> : <PriorityInboxPage />}
         </Box>

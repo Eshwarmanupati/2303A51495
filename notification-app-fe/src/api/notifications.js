@@ -16,28 +16,23 @@ export async function fetchNotifications(authToken, params = {}) {
     throw new Error("Authorization token is required to fetch notifications.");
   }
 
-  // Construct URL with optional query parameters
   const baseUrl = "http://4.224.186.213/evaluation-service/notifications";
   const url = new URL(baseUrl);
 
-  // Apply query parameters if they are provided
   if (params.limit) {
     url.searchParams.append("limit", params.limit.toString());
   }
   if (params.page) {
     url.searchParams.append("page", params.page.toString());
   }
-  // Only append type if it is a specific supported type (not "All")
   if (params.notification_type && params.notification_type !== "All") {
     url.searchParams.append("notification_type", params.notification_type);
   }
 
-  // Ensure Bearer prefix is present
   const formattedToken = authToken.trim().startsWith("Bearer ")
     ? authToken.trim()
     : `Bearer ${authToken.trim()}`;
 
-  // Log API start using the logger middleware
   const logParams = { ...params };
   logger.logApiStart(url.toString(), logParams);
 
@@ -62,7 +57,6 @@ export async function fetchNotifications(authToken, params = {}) {
           const text = await response.text();
           if (text) errorMessage = text;
         } catch {
-          // Ignore fallback errors
         }
       }
       throw new Error(errorMessage);
@@ -71,12 +65,10 @@ export async function fetchNotifications(authToken, params = {}) {
     const data = await response.json();
     const listCount = (data.notifications ?? []).length;
 
-    // Log API success using the logger middleware
     logger.logApiSuccess(url.toString(), listCount);
 
     return data;
   } catch (error) {
-    // Log API failure using the logger middleware
     logger.logApiFailure(url.toString(), error.message || error.toString());
     throw error;
   }

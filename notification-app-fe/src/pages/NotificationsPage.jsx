@@ -32,7 +32,6 @@ import { useNotifications } from "../hooks/useNotifications";
 import { logger } from "../api/logging";
 
 export function NotificationsPage() {
-  // Parse query parameters from the URL on load
   const [params, setParams] = useState(() => {
     const searchParams = new URLSearchParams(window.location.search);
     return {
@@ -42,16 +41,13 @@ export function NotificationsPage() {
     };
   });
 
-  // Persist token to localStorage
   const [token, setToken] = useState(() => {
     return localStorage.getItem("eval_auth_token") || "";
   });
   const [showToken, setShowToken] = useState(false);
 
-  // Fetch notifications using our custom hook
   const { notifications, total, loading, error, refetch } = useNotifications(token, params);
 
-  // Update browser URL query parameters when local page/limit/type changes
   const updateUrlParams = (newParams) => {
     const searchParams = new URLSearchParams();
     searchParams.set("page", newParams.page.toString());
@@ -66,7 +62,6 @@ export function NotificationsPage() {
   const handleFilterChange = (newType) => {
     const oldType = params.notification_type;
     if (oldType !== newType) {
-      // Log filter changes using logging middleware
       logger.logFilterChange("notification_type", oldType, newType);
       
       const newParams = { ...params, notification_type: newType, page: 1 };
@@ -77,7 +72,6 @@ export function NotificationsPage() {
 
   const handlePageChange = (newPage) => {
     if (params.page !== newPage) {
-      // Log pagination changes using logging middleware
       logger.logPaginationChange(newPage, params.limit);
       
       const newParams = { ...params, page: newPage };
@@ -89,7 +83,6 @@ export function NotificationsPage() {
   const handleLimitChange = (e) => {
     const newLimit = Number(e.target.value);
     if (params.limit !== newLimit) {
-      // Log pagination changes using logging middleware
       logger.logPaginationChange(1, newLimit);
       
       const newParams = { ...params, limit: newLimit, page: 1 };
@@ -104,7 +97,6 @@ export function NotificationsPage() {
     localStorage.setItem("eval_auth_token", val);
   };
 
-  // Sync state with back/forward navigation in the browser
   useEffect(() => {
     const handlePopState = () => {
       const searchParams = new URLSearchParams(window.location.search);
@@ -119,12 +111,10 @@ export function NotificationsPage() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Compute pagination details
   const totalPages = Math.ceil(total / params.limit) || 1;
 
   return (
     <Box>
-      {/* Header and Refresh Button */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <Badge badgeContent={total} color="primary" max={999}>
@@ -152,7 +142,6 @@ export function NotificationsPage() {
         </IconButton>
       </Stack>
 
-      {/* Auth Credentials Card */}
       <Paper 
         elevation={0}
         sx={{ 
@@ -194,7 +183,6 @@ export function NotificationsPage() {
         />
       </Paper>
 
-      {/* Filters and Limits Controls */}
       <Stack 
         direction={{ xs: "column", sm: "row" }} 
         spacing={2} 
@@ -236,7 +224,6 @@ export function NotificationsPage() {
 
       <Divider sx={{ mb: 3, opacity: 0.1 }} />
 
-      {/* Notification Lists Display */}
       {loading && (
         <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={10} gap={2}>
           <CircularProgress size={40} thickness={4} />
@@ -302,7 +289,6 @@ export function NotificationsPage() {
             ))}
           </Stack>
 
-          {/* Pagination Controls */}
           <Stack direction="row" justifyContent="center" alignItems="center" spacing={2} mt={3}>
             <Button
               variant="outlined"

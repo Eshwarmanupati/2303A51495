@@ -31,16 +31,13 @@ import { logger } from "../api/logging";
 export function PriorityInboxPage() {
   const [limit, setLimit] = useState(10);
   
-  // Persist token to localStorage
   const [token, setToken] = useState(() => {
     return localStorage.getItem("eval_auth_token") || "";
   });
   const [showToken, setShowToken] = useState(false);
 
-  // Fetch a larger set (e.g., 100) so we can sort and pick the true Top N locally
   const { notifications, loading, error, refetch } = useNotifications(token, { limit: 100 });
 
-  // Log priority page load whenever the page renders or top N limit changes
   useEffect(() => {
     if (token) {
       logger.logPriorityPageLoad(limit);
@@ -53,32 +50,27 @@ export function PriorityInboxPage() {
     localStorage.setItem("eval_auth_token", val);
   };
 
-  // Sort logic: Priority descending, Timestamp descending
   const sortedNotifications = [...notifications].sort((a, b) => {
     const scoreA = getPriorityScore(a.Type);
     const scoreB = getPriorityScore(b.Type);
 
     if (scoreA !== scoreB) {
-      return scoreB - scoreA; // Descending order of priority score
+      return scoreB - scoreA;
     }
 
-    // Secondary sort: timestamp descending (newer notifications rank higher)
     const timeA = new Date(a.Timestamp).getTime();
     const timeB = new Date(b.Timestamp).getTime();
     return timeB - timeA;
   });
 
-  // Slice to get the Top N (10/15/20)
   const displayNotifications = sortedNotifications.slice(0, limit);
 
-  // High priority count (Placement=3 and Result=2)
   const highPriorityCount = notifications.filter(
     (n) => getPriorityScore(n.Type) >= 2
   ).length;
 
   return (
     <Box>
-      {/* Header section with badge */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
           <Badge badgeContent={highPriorityCount} color="error" max={99}>
@@ -106,7 +98,6 @@ export function PriorityInboxPage() {
         </IconButton>
       </Stack>
 
-      {/* Auth Credentials Card */}
       <Paper 
         elevation={0}
         sx={{ 
@@ -148,7 +139,6 @@ export function PriorityInboxPage() {
         />
       </Paper>
 
-      {/* Limit Selection Controls */}
       <Stack 
         direction="row" 
         spacing={2} 
@@ -189,7 +179,6 @@ export function PriorityInboxPage() {
 
       <Divider sx={{ mb: 3, opacity: 0.1 }} />
 
-      {/* Priority List Display */}
       {loading && (
         <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={10} gap={2}>
           <CircularProgress size={40} thickness={4} />
@@ -255,7 +244,6 @@ export function PriorityInboxPage() {
         </Stack>
       )}
 
-      {/* Legend Footer */}
       {!loading && token && !error && (
         <Paper 
           elevation={0}

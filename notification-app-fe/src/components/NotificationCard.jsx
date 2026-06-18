@@ -49,7 +49,6 @@ export function NotificationCard({ notification }) {
   const score = getPriorityScore(Type);
   const config = TYPE_CONFIG[Type] || DEFAULT_CONFIG;
 
-  // Format date/time nicely
   const formatDate = (dateStr) => {
     try {
       const date = new Date(dateStr);
@@ -87,7 +86,6 @@ export function NotificationCard({ notification }) {
     >
       <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
-          {/* Circular Icon Container */}
           <Box
             sx={{
               display: "flex",
@@ -104,7 +102,6 @@ export function NotificationCard({ notification }) {
             {config.icon}
           </Box>
 
-          {/* Main details */}
           <Box sx={{ flexGrow: 1, width: "100%" }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} mb={0.5}>
               <Stack direction="row" spacing={1} alignItems="center">
