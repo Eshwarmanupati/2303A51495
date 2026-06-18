@@ -463,4 +463,96 @@ The key fix is to **separate the fast operation (DB save) from the slow operatio
 
 *End of Stage 5*
 
+---
 
+# Stage 6: Priority Inbox (Top N Notifications)
+
+## Goal
+
+Build a Priority Inbox that filters and ranks notifications to show the top $N$ most important updates. This is crucial for students to see critical career/academic updates (like Placements or Results) first, without getting drowned in general events.
+
+## Priority Order & Scoring
+
+Each notification has a type-based weight/priority score:
+
+| Type        | Priority Score | Description                                           |
+| ----------- | -------------- | ----------------------------------------------------- |
+| `Placement` | 3              | Highest priority — critical career-defining events.   |
+| `Result`    | 2              | Medium priority — academic outcomes/achievements.    |
+| `Event`     | 1              | Lowest priority — general campus events and announcements. |
+
+If notifications have the same type, the newer one ranks higher (Timestamp descending).
+
+## Sorting Strategy
+
+The sorting algorithm uses a stable multi-key comparator:
+1. **Primary Sort Key**: Priority Score (descending).
+2. **Secondary Sort Key**: Timestamp (descending).
+
+### Sort Comparator Logic (JS)
+
+```javascript
+function compareNotifications(a, b) {
+  const scoreA = getPriorityScore(a.Type);
+  const scoreB = getPriorityScore(b.Type);
+
+  if (scoreA !== scoreB) {
+    return scoreB - scoreA; // Descending
+  }
+
+  const timeA = new Date(a.Timestamp).getTime();
+  const timeB = new Date(b.Timestamp).getTime();
+  return timeB - timeA; // Descending (newer first)
+}
+```
+
+---
+
+## Bounded Top N Display (10 / 15 / 20)
+
+The user can configure the inbox size ($N$) via a dropdown selector (Top 10, 15, or 20).
+In the client-side implementation:
+1. Fetch all notifications from the remote server.
+2. Sort the entire dataset using the comparator.
+3. Slice the array to return the first $N$ items: `sortedNotifications.slice(0, N)`.
+
+---
+
+## Continuous Incoming Notifications (Min Heap Strategy)
+
+For a real-time system with streaming notifications (e.g. over WebSockets), sorting the entire list of notifications of size $K$ on every new arrival is inefficient ($O(K \log K)$).
+
+Instead, we maintain a **fixed-size Min Heap (Priority Queue)** of size $N$:
+
+### Min Heap Algorithm
+
+1. **Initialise**: Push the first $N$ incoming notifications onto the heap.
+2. **On New Notification**:
+   - Compare the new notification with the root of the heap (which represents the least important notification currently in our Top $N$).
+   - If the new notification's priority is **higher** than the root's priority:
+     - Dequeue the root (remove the least important).
+     - Enqueue the new notification.
+   - Otherwise, discard the new notification.
+
+```
+Incoming Notification
+       ↓
+[Priority Score] > [Heap Root Score]?
+       ├─ Yes ──→ Pop Root, Push New Notification, Re-heapify O(log N)
+       └─ No  ──→ Discard
+```
+
+### Complexity Comparison
+
+For a dataset of total size $K$ with $N$ displayed:
+
+| Metric | Full Re-sort | Fixed-Size Min Heap (Size N) |
+| --- | --- | --- |
+| **Insertion Complexity** | $O(K \log K)$ | $O(\log N)$ (effectively $O(1)$ since $N \le 20$) |
+| **Space Complexity** | $O(K)$ | $O(N)$ (very small footprint) |
+
+This heap-based solution ensures the client/server only performs bounded work per update, preventing browser freezes even when millions of notifications are ingested.
+
+---
+
+*End of Stage 6*
