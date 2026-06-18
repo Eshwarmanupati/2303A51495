@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Alert,
   Badge,
   Box,
-  Card,
   CircularProgress,
   Divider,
   FormControl,
@@ -17,68 +16,126 @@ import {
   Button,
   Paper,
   InputAdornment,
+  Pagination,
 } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
-import SortIcon from "@mui/icons-material/Sort";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 
 import { NotificationCard } from "../components/NotificationCard";
 import { NotificationFilter } from "../components/NotificationFilter";
-import { useNotifications, getPriorityScore } from "../hooks/useNotifications";
+import { useNotifications } from "../hooks/useNotifications";
+import { logger } from "../api/logging";
 
 export function NotificationsPage() {
-  const [filter, setFilter] = useState("All");
-  const [limit, setLimit] = useState(10);
-  
-  // Manage token state; persist to localStorage for easy grading/retries
+  // Parse query parameters from the URL on load
+  const [params, setParams] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return {
+      page: parseInt(searchParams.get("page") || "1", 10),
+      limit: parseInt(searchParams.get("limit") || "10", 10),
+      notification_type: searchParams.get("notification_type") || "All",
+    };
+  });
+
+  // Persist token to localStorage
   const [token, setToken] = useState(() => {
     return localStorage.getItem("eval_auth_token") || "";
   });
   const [showToken, setShowToken] = useState(false);
 
-  // Hook for API notifications
-  const { notifications, loading, error, refetch } = useNotifications(token);
+  // Fetch notifications using our custom hook
+  const { notifications, total, loading, error, refetch } = useNotifications(token, params);
 
-  // Save token changes
+  // Update browser URL query parameters when local page/limit/type changes
+  const updateUrlParams = (newParams) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set("page", newParams.page.toString());
+    searchParams.set("limit", newParams.limit.toString());
+    if (newParams.notification_type !== "All") {
+      searchParams.set("notification_type", newParams.notification_type);
+    }
+    const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
+    window.history.pushState(null, "", newUrl);
+  };
+
+  const handleFilterChange = (newType) => {
+    const oldType = params.notification_type;
+    if (oldType !== newType) {
+      // Log filter changes using logging middleware
+      logger.logFilterChange("notification_type", oldType, newType);
+      
+      const newParams = { ...params, notification_type: newType, page: 1 };
+      setParams(newParams);
+      updateUrlParams(newParams);
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    if (params.page !== newPage) {
+      // Log pagination changes using logging middleware
+      logger.logPaginationChange(newPage, params.limit);
+      
+      const newParams = { ...params, page: newPage };
+      setParams(newParams);
+      updateUrlParams(newParams);
+    }
+  };
+
+  const handleLimitChange = (e) => {
+    const newLimit = Number(e.target.value);
+    if (params.limit !== newLimit) {
+      // Log pagination changes using logging middleware
+      logger.logPaginationChange(1, newLimit);
+      
+      const newParams = { ...params, limit: newLimit, page: 1 };
+      setParams(newParams);
+      updateUrlParams(newParams);
+    }
+  };
+
   const handleTokenChange = (e) => {
     const val = e.target.value;
     setToken(val);
     localStorage.setItem("eval_auth_token", val);
   };
 
-  const toggleShowToken = () => {
-    setShowToken((prev) => !prev);
-  };
+  // Sync state with back/forward navigation in the browser
+  useEffect(() => {
+    const handlePopState = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      setParams({
+        page: parseInt(searchParams.get("page") || "1", 10),
+        limit: parseInt(searchParams.get("limit") || "10", 10),
+        notification_type: searchParams.get("notification_type") || "All",
+      });
+    };
 
-  // Filter & Slice the sorted notifications
-  const filteredNotifications = notifications.filter((n) => {
-    if (filter === "All") return true;
-    return n.Type === filter;
-  });
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
-  // Take the Top N
-  const displayNotifications = filteredNotifications.slice(0, limit);
-
-  // Calculate unread count (for display, e.g. how many Placements or high priority notifications)
-  const highPriorityCount = notifications.filter(n => getPriorityScore(n.Type) >= 2).length;
+  // Compute pagination details
+  const totalPages = Math.ceil(total / params.limit) || 1;
 
   return (
-    <Box sx={{ maxWidth: 760, mx: "auto", px: 2, py: 4 }}>
-      {/* Header section with modern title & badge */}
+    <Box>
+      {/* Header and Refresh Button */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Badge badgeContent={highPriorityCount} color="error" max={99}>
+          <Badge badgeContent={total} color="primary" max={999}>
             <NotificationsIcon sx={{ fontSize: 32, color: "primary.main" }} />
           </Badge>
           <Box>
             <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: "-0.5px" }}>
-              Priority Inbox
+              General Inbox
             </Typography>
             <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.4)" }}>
-              Top {limit} most important updates
+              Viewing all campus notifications
             </Typography>
           </Box>
         </Stack>
@@ -95,7 +152,7 @@ export function NotificationsPage() {
         </IconButton>
       </Stack>
 
-      {/* Auth Token Configuration Card */}
+      {/* Auth Credentials Card */}
       <Paper 
         elevation={0}
         sx={{ 
@@ -122,7 +179,7 @@ export function NotificationsPage() {
             input: {
               endAdornment: (
                 <InputAdornment position="end">
-                  <IconButton onClick={toggleShowToken} edge="end">
+                  <IconButton onClick={() => setShowToken(!showToken)} edge="end">
                     {showToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
                   </IconButton>
                 </InputAdornment>
@@ -135,12 +192,9 @@ export function NotificationsPage() {
             }
           }}
         />
-        <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.35)", mt: 1, display: "block" }}>
-          *Token is securely stored locally and used for <code>Authorization: Bearer &lt;token&gt;</code> header.
-        </Typography>
       </Paper>
 
-      {/* Filters and Limits Row */}
+      {/* Filters and Limits Controls */}
       <Stack 
         direction={{ xs: "column", sm: "row" }} 
         spacing={2} 
@@ -149,18 +203,18 @@ export function NotificationsPage() {
         mb={3}
       >
         <Box>
-          <NotificationFilter value={filter} onChange={setFilter} />
+          <NotificationFilter value={params.notification_type} onChange={handleFilterChange} />
         </Box>
         
         <Box sx={{ minWidth: 140 }}>
           <FormControl fullWidth size="small">
-            <InputLabel id="limit-select-label">Inbox Size</InputLabel>
+            <InputLabel id="limit-select-label">Items Per Page</InputLabel>
             <Select
               labelId="limit-select-label"
               id="limit-select"
-              value={limit}
-              label="Inbox Size"
-              onChange={(e) => setLimit(Number(e.target.value))}
+              value={params.limit}
+              label="Items Per Page"
+              onChange={handleLimitChange}
               sx={{ 
                 borderRadius: "8px",
                 "& .MuiSelect-select": {
@@ -171,9 +225,10 @@ export function NotificationsPage() {
                 }
               }}
             >
-              <MenuItem value={10}>Top 10</MenuItem>
-              <MenuItem value={15}>Top 15</MenuItem>
-              <MenuItem value={20}>Top 20</MenuItem>
+              <MenuItem value={5}>5 per page</MenuItem>
+              <MenuItem value={10}>10 per page</MenuItem>
+              <MenuItem value={15}>15 per page</MenuItem>
+              <MenuItem value={20}>20 per page</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -181,12 +236,12 @@ export function NotificationsPage() {
 
       <Divider sx={{ mb: 3, opacity: 0.1 }} />
 
-      {/* Core UI Notification display */}
+      {/* Notification Lists Display */}
       {loading && (
         <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={10} gap={2}>
           <CircularProgress size={40} thickness={4} />
           <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.5)" }}>
-            Fetching & sorting priority notifications...
+            Loading general notifications...
           </Typography>
         </Box>
       )}
@@ -200,16 +255,13 @@ export function NotificationsPage() {
             backgroundColor: "rgba(2, 136, 209, 0.05)",
             border: "1px dashed rgba(2, 136, 209, 0.3)",
             py: 3,
-            textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center"
+            textAlign: "center"
           }}
         >
           <Typography fontWeight={700} variant="h6" mb={1}>
             Authorization Required
           </Typography>
-          Please enter your Bearer Authorization token in the credentials field above to fetch updates.
+          Please enter your Bearer Authorization token above to fetch notifications.
         </Alert>
       )}
 
@@ -228,45 +280,55 @@ export function NotificationsPage() {
         </Alert>
       )}
 
-      {!loading && token && !error && displayNotifications.length === 0 && (
+      {!loading && token && !error && notifications.length === 0 && (
         <Alert 
           severity="info" 
           variant="outlined" 
           sx={{ 
             borderRadius: "12px",
             border: "1px dashed rgba(255, 255, 255, 0.1)",
-            backgroundColor: "transparent",
             py: 3
           }}
         >
-          No notifications found matching type <strong>{filter}</strong>.
+          No notifications found matching type <strong>{params.notification_type}</strong>.
         </Alert>
       )}
 
-      {!loading && token && !error && displayNotifications.length > 0 && (
-        <Stack spacing={2}>
-          {displayNotifications.map((n, idx) => (
-            <NotificationCard key={n.ID || idx} notification={n} />
-          ))}
-        </Stack>
-      )}
+      {!loading && token && !error && notifications.length > 0 && (
+        <>
+          <Stack spacing={2} mb={4}>
+            {notifications.map((n, idx) => (
+              <NotificationCard key={n.ID || idx} notification={n} />
+            ))}
+          </Stack>
 
-      {/* Priority Legend footer */}
-      {!loading && token && !error && (
-        <Paper 
-          elevation={0}
-          sx={{ 
-            p: 2, 
-            mt: 4, 
-            borderRadius: "8px", 
-            border: "1px solid rgba(255, 255, 255, 0.05)",
-            backgroundColor: "rgba(255, 255, 255, 0.01)" 
-          }}
-        >
-          <Typography variant="caption" sx={{ color: "rgba(255, 255, 255, 0.4)", display: "flex", alignItems: "center", gap: 1 }}>
-            <SortIcon fontSize="inherit" /> Sorting Order: <strong>Placement (3)</strong> &gt; <strong>Result (2)</strong> &gt; <strong>Event (1)</strong>. Tie-breakers are resolved with newer timestamps.
-          </Typography>
-        </Paper>
+          {/* Pagination Controls */}
+          <Stack direction="row" justifyContent="center" alignItems="center" spacing={2} mt={3}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<ArrowBackIcon />}
+              disabled={params.page <= 1}
+              onClick={() => handlePageChange(params.page - 1)}
+              sx={{ borderRadius: "8px", textTransform: "none" }}
+            >
+              Previous
+            </Button>
+            <Typography variant="body2" fontWeight={600} sx={{ color: "rgba(255, 255, 255, 0.7)" }}>
+              Page {params.page} of {totalPages}
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              endIcon={<ArrowForwardIcon />}
+              disabled={params.page >= totalPages}
+              onClick={() => handlePageChange(params.page + 1)}
+              sx={{ borderRadius: "8px", textTransform: "none" }}
+            >
+              Next
+            </Button>
+          </Stack>
+        </>
       )}
     </Box>
   );
