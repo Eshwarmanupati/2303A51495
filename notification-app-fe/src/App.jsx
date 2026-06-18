@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from "react";
 import { ThemeProvider, createTheme, CssBaseline, Box, Paper, Tabs, Tab, Container } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
